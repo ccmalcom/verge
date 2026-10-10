@@ -12,7 +12,7 @@ The state of record. Update after every task, commit and push it with the task.
 |---|---|---|---|
 | A | 1, 2 | done | |
 | B | 3, 4, 5 | done | |
-| C | 6, 7 | in_progress | |
+| C | 6, 7 | needs_chase | |
 | D | 8, 9 | pending | |
 | E | 10, 11 | pending | |
 
@@ -66,11 +66,18 @@ One entry per finished task, appended in order:
 - Deferred: none. Observations for Task 8: (1) libheif writes its own "Could not parse HEIF file ..." line to the console before the error is thrown; harmless noise. (2) A file named `.heic` whose bytes are not HEIF at all is not routed to heic-decode (`isHeic` checks bytes), so it fails with sharp's `Input buffer contains unsupported image format`, which names no file; Task 8's per-case error handling should prefix the case id.
 - Next: Task 7.
 
+### Task 7: Apple `fm` CLI adapter
+- Done: `proxy/eval/apple-fm.ts` (`AppleMode`, `FmRunner`, `fmAvailable`, `parseFmOutput`, `appleGenerator` with `prompt` and `json-schema` modes; model names `apple-on-device` / `apple-pcc`) and `test/eval/apple-fm.test.ts`. Code exactly as the plan wrote it.
+- Verified: `npx vitest run test/eval/apple-fm.test.ts` failed first ("Cannot find module '../../eval/apple-fm.js'"); after implementation `npm test` → 12 files, 85/85 passed; `npm run typecheck` → tsc exit 0. Real-flow on this Linux machine (no `fm` on PATH): `fmAvailable()` → `false`; the default runner on a tier-1 call threw `VendorError: fm exited 1: spawn fm ENOENT`, so a missing CLI maps to a vendor error rather than a crash. The real `fm respond` call (device and PCC, both schema modes) can only run on Chase's Mac; listed under Needs Chase.
+- Deferred: live `fm` verification, to Task 11 on Chase's Mac (as the plan intends).
+- Next: end of batch (Batch D starts at Task 8).
+
 ## Needs Chase
 
 Items only Chase can supply. Add, never silently drop.
 
-(none yet)
+- Apple `fm` CLI on Chase's Mac (Task 7, checked in Task 11): run `appleGenerator('device')` and `appleGenerator('pcc')` against real `fm respond`, in the default `prompt` mode and with `APPLE_FM_SCHEMA_MODE=json-schema`, to confirm the argument shape (`--instructions`, `--image`, `--model pcc`, `--schema`) and whether `fm` accepts a plain JSON Schema file. Cannot run on Linux: `fm` is not on PATH here.
+- Real iPhone HEIC photos (Task 6, checked in Task 11): the HEIC path was verified with a mocked decoder and with the real heic-decode rejecting a fake header; decoding a genuine iPhone HEIC (and its EXIF date/GPS) needs Chase's photos.
 
 ## Deviations from the plan
 
