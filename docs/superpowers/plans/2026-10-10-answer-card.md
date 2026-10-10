@@ -17,7 +17,7 @@ adapter serves Apple. `runAsk` is the shared pipeline: validate → prompt → g
 scaffolds a manifest, drives the handler over local HTTP, and serves a review page.
 
 **Tech Stack:** Node ≥ 22.12, TypeScript ^6 (NodeNext), `ai` 7 + `@ai-sdk/{anthropic,openai,google}` 4,
-`zod` 4, `vitest` 5 (+ `vite`), `tsx`, `srvx`, `sharp` 0.35, `exifr` 7.
+`zod` 4, `vitest` 5 (+ `vite`), `tsx`, `srvx`, `sharp` 0.35, `exifr` 7, `heic-decode` 2.
 
 **Spec:** `docs/superpowers/specs/2026-10-10-answer-card-design.md` (roadmap:
 `docs/superpowers/specs/2026-10-10-verge-roadmap.md`).
@@ -77,6 +77,10 @@ scaffolds a manifest, drives the handler over local HTTP, and serves a review pa
   scored runs (with `scores.json`) are never pruned automatically.
 - Image limit: 600 KB decoded (`600 * 1024` bytes). Harness resizes to 1000 px long edge, JPEG q80,
   metadata stripped.
+- HEIC (iPhone default) is a first-class input. sharp's prebuilt binaries read HEIC metadata but
+  fail to decode it (verified 2026-10-10: "bad seek"), so the harness decodes HEIC with `heic-decode`
+  (libheif compiled to wasm, no system install) and hands the raw RGBA pixels to sharp. Date and GPS
+  are read by `exifr` from the original file before decoding.
 - Git: plain commit messages, no `Co-Authored-By` trailer; stage explicit paths; push after
   every commit.
 
@@ -84,7 +88,7 @@ scaffolds a manifest, drives the handler over local HTTP, and serves a review pa
 
 Inputs the spec implies but no happy-path test exercises; each has a test in its owning task.
 
-1. **iPhone HEIC photos dropped in `photos/`**: scaffold warns with how to export JPEG and skips them; never crashes (Task 6, `warns and skips HEIC`).
+1. **iPhone HEIC photos dropped in `photos/` as AirDrop delivers them**: scaffold accepts them like JPEGs and the harness decodes them; a corrupt or non-HEIC file named `.heic` fails that one case with a clear error, never the whole run (Task 6, `accepts HEIC photos as cases`, `decodes HEIC through heic-decode`, `rejects a fake HEIC with a clear error`).
 2. **A photo with no EXIF date or GPS** (screenshot, AirDrop, edited): `taken_at` falls back to file mtime, location is null, only the without-location variant runs (Task 6 `falls back to mtime`, Task 8 `skips with-variant when no location`).
 3. **A vendor rate-limits or fails mid-run**: that record gets a non-200 status with the detail; the run continues and still writes results (Task 5 `vendor error → 502`, Task 8 `records a failed request and keeps going`).
 4. **Model returns no follow-ups, or more than three**: trimmed to three; the deeper call is skipped when there are none (Task 2 `trims follow_ups`, Task 8 `skips deeper when no follow-ups`).
@@ -141,7 +145,7 @@ Run:
 ```bash
 cd proxy
 npm install ai@^7.0.137 @ai-sdk/anthropic@^4 @ai-sdk/openai@^4 @ai-sdk/google@^4 zod@^4.6.5
-npm install -D typescript@^6 vitest@^5.0.3 vite tsx@^4 srvx@^1.0.5 sharp@^0.35.5 exifr@^7.1.3 @types/node@^22
+npm install -D typescript@^6 vitest@^5.0.3 vite tsx@^4 srvx@^1.0.5 sharp@^0.35.5 exifr@^7.1.3 heic-decode@^2.1.0 @types/node@^22
 ```
 Expected: both succeed; `package.json` gains `dependencies` and `devDependencies`; `package-lock.json` created.
 
@@ -1509,14 +1513,14 @@ git push
 ### Task 6: Image prep, photo metadata and manifest scaffold
 
 **Files:**
-- Create: `proxy/eval/paths.ts`, `proxy/eval/types.ts`, `proxy/eval/image.ts`, `proxy/eval/manifest.ts`, `proxy/eval/scaffold.ts`
-- Test: `proxy/test/eval/image.test.ts`, `proxy/test/eval/scaffold.test.ts`
+- Create: `proxy/eval/paths.ts`, `proxy/eval/types.ts`, `proxy/eval/image.ts`, `proxy/eval/heic-decode.d.ts`, `proxy/eval/manifest.ts`, `proxy/eval/scaffold.ts`
+- Test: `proxy/test/eval/image.test.ts`, `proxy/test/eval/image-heic.test.ts`, `proxy/test/eval/scaffold.test.ts`
 
 **Interfaces:**
 - Consumes: `CloudVendor`, `AskError`, `AskMeta`, `DeeperOutput`, `EnforcedCard` (Task 1); `roundLocation` (Task 2).
 - Produces (`paths.ts`): `EVAL_DIR`, `PROXY_DIR`, `EVAL_DATA_DIR` (= `process.env.VERGE_EVAL_DIR ?? EVAL_DIR`), `PHOTOS_DIR`, `MANIFEST_PATH`, `RUNS_DIR`; `latestRunDir(runsDir?: string): string | null`; `resolveRunDir(arg?: string, runsDir?: string): string`.
 - Produces (`types.ts`): `type HarnessVendor = CloudVendor | 'apple-device' | 'apple-pcc'`; `HARNESS_VENDORS: readonly HarnessVendor[]`; `type Variant = 'with' | 'without'`; `type LatLng = { lat: number; lng: number }`; `type ManifestCase = { id: string; file: string | null; note_file: string | null; taken_at: string; approx_location: LatLng | null; note: string; truth: string; neighborhood: string }`; `type Manifest = { cases: ManifestCase[] }`; `type LocationMode = 'both' | 'with' | 'without'`; `type DeeperRecord`; `type ResultRecord`; `type RunResults`; `type Blind`; `type Verdict`; `type LocationVerdict`; `type ScoreEntry`; `type Scores`; `type CardView` (full definitions in Step 3).
-- Produces (`image.ts`): `prepareImage(input: string | Buffer): Promise<Buffer>`; `type PhotoMeta = { taken_at: string | null; approx_location: LatLng | null }`; `readPhotoMeta(filePath: string): Promise<PhotoMeta>`.
+- Produces (`image.ts`): `isHeic(bytes: Uint8Array): boolean`; `prepareImage(input: string | Buffer): Promise<Buffer>` (accepts JPEG, PNG, WebP and HEIC); `type PhotoMeta = { taken_at: string | null; approx_location: LatLng | null }`; `readPhotoMeta(filePath: string): Promise<PhotoMeta>`.
 - Produces (`manifest.ts`): `caseId(base: string): string`; `defaultVariant(c: Pick<ManifestCase, 'approx_location'>): Variant`; `type MetaReader = (filePath: string) => Promise<PhotoMeta>`; `scaffold(photosDir: string, existing: Manifest | null, readMeta: MetaReader): Promise<{ manifest: Manifest; warnings: string[] }>`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1572,6 +1576,59 @@ describe('readPhotoMeta', () => {
 If `withExif` is unavailable in the installed sharp, use
 `img.withMetadata({ exif: { IFD0: { Copyright: 'synthetic-secret' } } })` instead; keep the assertion.
 
+`proxy/test/eval/image-heic.test.ts` (separate file, because it mocks `heic-decode`; the real decoder
+was verified on two sample HEIC files at plan time, and on Chase's own iPhone photos in Task 11):
+```ts
+import sharp from 'sharp';
+import { describe, expect, it, vi } from 'vitest';
+
+// 3x2 opaque red RGBA, standing in for a decoded photo.
+vi.mock('heic-decode', () => ({
+  default: vi.fn(async () => ({ width: 3, height: 2, data: new Uint8ClampedArray(3 * 2 * 4).map((_, i) => (i % 4 === 1 || i % 4 === 2 ? 0 : 255)) })),
+}));
+
+const { isHeic, prepareImage } = await import('../../eval/image.js');
+
+// An ftyp box: size, 'ftyp', major brand, minor version, compatible brands. Then padding.
+function ftyp(major: string, compatible: string[] = []): Buffer {
+  const size = 16 + compatible.length * 4;
+  const box = Buffer.alloc(size);
+  box.writeUInt32BE(size, 0);
+  box.write(`ftyp${major}`, 4, 'ascii');
+  compatible.forEach((b, i) => box.write(b, 16 + i * 4, 'ascii'));
+  return Buffer.concat([box, Buffer.alloc(16)]);
+}
+const heicHeader = () => ftyp('heic', ['mif1', 'heic']);
+
+describe('isHeic', () => {
+  it('recognises HEIC by its ftyp brands, not its extension', () => {
+    expect(isHeic(ftyp('heic', ['mif1', 'heic']))).toBe(true); // iPhone
+    expect(isHeic(ftyp('mif1', ['mif1', 'heic', 'hevc']))).toBe(true); // HEVC only in compatible brands
+    expect(isHeic(ftyp('heix'))).toBe(true);
+    expect(isHeic(ftyp('avif', ['mif1', 'miaf']))).toBe(false); // AVIF stays with sharp
+    expect(isHeic(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0]))).toBe(false);
+    expect(isHeic(Buffer.alloc(4))).toBe(false);
+  });
+});
+
+describe('prepareImage with HEIC', () => {
+  it('decodes HEIC through heic-decode and returns a JPEG', async () => {
+    const out = await prepareImage(heicHeader());
+    const meta = await sharp(out).metadata();
+    expect(meta.format).toBe('jpeg');
+    expect([meta.width, meta.height]).toEqual([3, 2]);
+    const { default: decode } = await import('heic-decode');
+    expect(decode).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a fake HEIC with a clear error', async () => {
+    const { default: decode } = await import('heic-decode');
+    vi.mocked(decode).mockRejectedValueOnce(new Error('input buffer is not a HEIC image'));
+    await expect(prepareImage(heicHeader())).rejects.toThrow(/could not decode HEIC/);
+  });
+});
+```
+
 `proxy/test/eval/scaffold.test.ts`:
 ```ts
 import { mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
@@ -1601,11 +1658,17 @@ describe('scaffold', () => {
     ]);
   });
 
-  it('warns and skips HEIC, unknown files and empty note-only cases', async () => {
-    const dir = photosDir({ 'IMG_0002.HEIC': 'x', 'notes.md': 'x', 'empty.txt': '   ' });
+  it('accepts HEIC photos as cases', async () => {
+    const dir = photosDir({ 'IMG_0002.HEIC': 'x', 'IMG_0003.heif': 'x' });
+    const { manifest, warnings } = await scaffold(dir, null, withMeta);
+    expect(warnings).toEqual([]);
+    expect(manifest.cases.map((c) => c.file)).toEqual(['IMG_0002.HEIC', 'IMG_0003.heif']);
+  });
+
+  it('warns and skips unknown files and empty note-only cases', async () => {
+    const dir = photosDir({ 'notes.md': 'x', 'empty.txt': '   ' });
     const { manifest, warnings } = await scaffold(dir, null, withMeta);
     expect(manifest.cases).toEqual([]);
-    expect(warnings.join('\n')).toMatch(/IMG_0002\.HEIC.*JPEG/);
     expect(warnings.join('\n')).toMatch(/notes\.md/);
     expect(warnings.join('\n')).toMatch(/empty\.txt/);
   });
@@ -1770,18 +1833,60 @@ export type CardView = {
 
 - [ ] **Step 4: Implement image.ts**
 
+`proxy/eval/heic-decode.d.ts` (the package ships no types):
+```ts
+declare module 'heic-decode' {
+  type Decoded = { width: number; height: number; data: Uint8ClampedArray };
+  function decode(opts: { buffer: Uint8Array | ArrayBufferLike }): Promise<Decoded>;
+  export default decode;
+}
+```
+
 `proxy/eval/image.ts`:
 ```ts
 import exifr from 'exifr';
+import decodeHeic from 'heic-decode';
+import { readFile } from 'node:fs/promises';
 import sharp from 'sharp';
 import { roundLocation } from '../src/card/context.js';
 import type { LatLng } from './types.js';
 
+// ISO-BMFF brands that mean HEVC-coded HEIF. Checked across the major brand and every compatible
+// brand in the ftyp box: iPhone writes major 'heic', but other HEIC writers use major 'mif1' with
+// 'heic' only in the compatible list (seen in a real sample, 2026-10-10). AVIF lists 'avif'/'mif1'
+// and no HEVC brand, so it stays with sharp, which decodes it natively.
+const HEIC_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis']);
+
+export function isHeic(bytes: Uint8Array): boolean {
+  if (bytes.length < 12) return false;
+  const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (buf.toString('ascii', 4, 8) !== 'ftyp') return false;
+  const boxEnd = Math.min(buf.readUInt32BE(0), buf.length);
+  const brands = [buf.toString('ascii', 8, 12)];
+  for (let o = 16; o + 4 <= boxEnd; o += 4) brands.push(buf.toString('ascii', o, o + 4));
+  return brands.some((b) => HEIC_BRANDS.has(b));
+}
+
+// sharp's prebuilt libvips reads HEIC headers but cannot decode HEVC pixels, so HEIC goes through
+// heic-decode (libheif wasm). libheif applies the file's rotation, so the pixels arrive upright.
+async function toSharp(input: string | Buffer): Promise<sharp.Sharp> {
+  const bytes = typeof input === 'string' ? await readFile(input) : input;
+  if (!isHeic(bytes)) return sharp(bytes).autoOrient();
+  let decoded: { width: number; height: number; data: Uint8ClampedArray };
+  try {
+    decoded = await decodeHeic({ buffer: bytes });
+  } catch (e) {
+    const name = typeof input === 'string' ? input : 'buffer';
+    throw new Error(`could not decode HEIC (${name}): ${e instanceof Error ? e.message : String(e)}`);
+  }
+  const { width, height, data } = decoded;
+  return sharp(Buffer.from(data.buffer, data.byteOffset, data.byteLength), { raw: { width, height, channels: 4 } });
+}
+
 // What the app will do before upload: orient, fit inside 1000x1000, JPEG, no metadata
 // (sharp strips all metadata unless keepMetadata/withMetadata is used).
 export async function prepareImage(input: string | Buffer): Promise<Buffer> {
-  return sharp(input)
-    .autoOrient()
+  return (await toSharp(input))
     .resize({ width: 1000, height: 1000, fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality: 80 })
     .toBuffer();
@@ -1822,8 +1927,7 @@ import path from 'node:path';
 import type { PhotoMeta } from './image.js';
 import type { Manifest, ManifestCase, Variant } from './types.js';
 
-const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
-const HEIC_EXT = new Set(['.heic', '.heif']);
+const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']);
 
 export type MetaReader = (filePath: string) => Promise<PhotoMeta>;
 
@@ -1847,10 +1951,6 @@ export async function scaffold(
   for (const f of files) {
     const ext = path.extname(f).toLowerCase();
     const base = f.slice(0, f.length - ext.length);
-    if (HEIC_EXT.has(ext)) {
-      warnings.push(`${f}: HEIC can't be read here. Export it as JPEG (on iPhone, share it as "Most Compatible" or set Settings > Camera > Formats > Most Compatible) and re-run.`);
-      continue;
-    }
     const group = groups.get(base) ?? {};
     if (IMAGE_EXT.has(ext)) {
       if (group.image) {
@@ -1861,7 +1961,7 @@ export async function scaffold(
     } else if (ext === '.txt') {
       group.note = f;
     } else {
-      warnings.push(`${f}: not an image (.jpg .jpeg .png .webp) or a .txt note; skipped`);
+      warnings.push(`${f}: not an image (.jpg .jpeg .png .webp .heic .heif) or a .txt note; skipped`);
       continue;
     }
     groups.set(base, group);
@@ -1944,8 +2044,8 @@ Expected: prints `0 case(s), 0 with location, written to …/manifest.json` and 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add proxy/eval/paths.ts proxy/eval/types.ts proxy/eval/image.ts proxy/eval/manifest.ts proxy/eval/scaffold.ts proxy/test/eval/image.test.ts proxy/test/eval/scaffold.test.ts
-git commit -m "feat(eval): add image prep, photo metadata and manifest scaffold"
+git add proxy/eval/paths.ts proxy/eval/types.ts proxy/eval/image.ts proxy/eval/heic-decode.d.ts proxy/eval/manifest.ts proxy/eval/scaffold.ts proxy/test/eval/image.test.ts proxy/test/eval/image-heic.test.ts proxy/test/eval/scaffold.test.ts
+git commit -m "feat(eval): add image prep with HEIC decoding, photo metadata and manifest scaffold"
 git push
 ```
 
@@ -3685,7 +3785,7 @@ Nothing here needs filling in by hand.
 
 ## Each round
 
-1. Drop photos into `eval/photos/` (JPEG/PNG/WebP; export iPhone HEIC as JPEG). Optional: a same-name
+1. Drop photos into `eval/photos/` as they come off the phone (HEIC, JPEG, PNG or WebP). Optional: a same-name
    `.txt` beside a photo is its note; a `.txt` alone is a note-only case.
 2. `npm run eval:scaffold`: builds `eval/manifest.json` from EXIF (date, GPS rounded to ~100 m).
    Editing it is optional (`truth`, `neighborhood`, `note`); re-running keeps your edits.
@@ -3746,7 +3846,9 @@ Add to the ledger under "Needs Chase" (keep any items already there):
 - Fill API keys in `proxy/.env.local`, then `npm run smoke`.
 - Put ≥ 3 of your own JPEG photos in `proxy/eval/photos/`, then scaffold → run → open the review
   page in a browser and judge them → summary. Confirm a GPS-tagged photo shows "with location"
-  (verifies EXIF GPS reading on a real phone photo).
+  (verifies EXIF GPS reading on a real phone photo). Include at least one untouched iPhone HEIC
+  taken in portrait: it must appear upright on the review page, and scaffold must report its real
+  capture date and location (verifies HEIC decoding, rotation and HEIC EXIF on a real file).
 - On the Mac (macOS 27): `fm respond --help` and `fm schema --help`; confirm the flags used in
   `eval/apple-fm.ts` (`--instructions`, `--image`, `--model pcc`, `--schema`); run
   `npm run eval:run -- --vendors apple-device,apple-pcc --cases <one-id>`; then try
