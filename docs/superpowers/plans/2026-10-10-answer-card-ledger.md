@@ -12,7 +12,7 @@ The state of record. Update after every task, commit and push it with the task.
 |---|---|---|---|
 | A | 1, 2 | done | |
 | B | 3, 4, 5 | done | |
-| C | 6, 7 | pending | |
+| C | 6, 7 | in_progress | |
 | D | 8, 9 | pending | |
 | E | 10, 11 | pending | |
 
@@ -60,6 +60,12 @@ One entry per finished task, appended in order:
 - Deferred: none. Live vendor calls are Task 11's smoke test.
 - Next: end of batch (Batch C starts at Task 6).
 
+### Task 6: Image prep, photo metadata and manifest scaffold
+- Done: `proxy/eval/paths.ts`, `types.ts`, `image.ts` (`isHeic`, `prepareImage` with HEIC through heic-decode, `readPhotoMeta`), `heic-decode.d.ts`, `manifest.ts` (`caseId`, `defaultVariant`, `scaffold`), `scaffold.ts` CLI; tests `test/eval/image.test.ts`, `test/eval/image-heic.test.ts`, `test/eval/scaffold.test.ts`. Code as the plan wrote it except one type import (see Deviations). sharp's `withExif` exists in 0.35, so the `withMetadata` fallback was not needed.
+- Verified: `npx vitest run test/eval` failed first (3 files, "Cannot find module '../../eval/image.js'" / "'../../eval/manifest.js'"); after implementation `npm test` → 11 files, 78/78 passed; `npm run typecheck` → tsc exit 0. CLI: `VERGE_EVAL_DIR=$(mktemp -d) npm run eval:scaffold` printed `0 case(s), 0 with location, written to …/manifest.json` and the "Add photos" hint, exit 0. Extra real-flow run on synthetic files in a temp `VERGE_EVAL_DIR`: a 2400x1600 JPEG carrying EXIF DateTimeOriginal and GPS scaffolded with `taken_at: 2026-05-01T09:15:00` and location rounded to `{39.757, -86.146}`; a PNG and a note-only `.txt` fell back to mtime with null location; `notes.md` was warned and skipped; `prepareImage` on the JPEG gave a 1000x667 JPEG with no GPS left; a fake HEIC header through the real (unmocked) heic-decode threw `could not decode HEIC (buffer): HEIF image not found`.
+- Deferred: none. Observations for Task 8: (1) libheif writes its own "Could not parse HEIF file ..." line to the console before the error is thrown; harmless noise. (2) A file named `.heic` whose bytes are not HEIF at all is not routed to heic-decode (`isHeic` checks bytes), so it fails with sharp's `Input buffer contains unsupported image format`, which names no file; Task 8's per-case error handling should prefix the case id.
+- Next: Task 7.
+
 ## Needs Chase
 
 Items only Chase can supply. Add, never silently drop.
@@ -72,3 +78,4 @@ Any place the code had to differ from the plan's text (an API that behaved diffe
 that needed adjusting), with the reason.
 
 - Task 5, `proxy/test/handler.test.ts:30`: `(await res.json())` became `((await res.json()) as { card: { headline: string } })`. With @types/node 22, `Response.json()` returns `Promise<unknown>`, so tsc raised TS2571. Type-only; the assertion and expected value are unchanged, and no production code differs from the plan.
+- Task 6, `proxy/eval/image.ts`: `import sharp from 'sharp'` + `Promise<sharp.Sharp>` became `import sharp, { type Sharp } from 'sharp'` + `Promise<Sharp>`. sharp 0.35 resolves ESM types from `dist/index.d.mts`, which exports `Sharp` as a named interface and has no `sharp` namespace, so tsc raised TS2503. Type-only; no behavior change.
