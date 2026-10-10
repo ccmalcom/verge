@@ -1,0 +1,37 @@
+{
+  "name": "verge-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "smoke": "vitest run --config vitest.smoke.config.ts",
+    "eval:scaffold": "tsx eval/scaffold.ts",
+    "eval:run": "tsx eval/run.ts",
+    "eval:review": "tsx eval/review/server.ts",
+    "eval:summary": "tsx eval/summary.ts",
+    "eval:export": "tsx eval/export.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.78",
+    "@ai-sdk/google": "^4.0.93",
+    "@ai-sdk/openai": "^4.0.91",
+    "ai": "^7.0.137",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "exifr": "^7.1.3",
+    "heic-decode": "^2.1.0",
+    "sharp": "^0.35.5",
+    "srvx": "^1.0.5",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3"
+  }
+}

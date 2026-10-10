@@ -10,7 +10,7 @@ The state of record. Update after every task, commit and push it with the task.
 
 | Batch | Tasks | Status | Review |
 |---|---|---|---|
-| A | 1, 2 | pending | |
+| A | 1, 2 | in_progress | |
 | B | 3, 4, 5 | pending | |
 | C | 6, 7 | pending | |
 | D | 8, 9 | pending | |
@@ -30,7 +30,11 @@ One entry per finished task, appended in order:
 - Next: <next task or "end of batch">
 ```
 
-(no entries yet)
+### Task 1: Proxy package scaffold and card schema
+- Done: `proxy/` package (ESM, Node >=22.12) with deps installed by `npm install` inside `proxy/` (ai 7.0.137+, @ai-sdk/anthropic 4.0.78, openai 4.0.91, google 4.0.93, zod 4.6.5; dev: typescript 6.0.3, vitest 5.0.3, vite 8.3.4, tsx 4.23.15, srvx, sharp 0.35.5, exifr, heic-decode, @types/node 22); `tsconfig.json`, `vitest.config.ts`, `.env.local.example` (key names only); `src/card/schema.ts`; `test/fixtures.ts`; `test/schema.test.ts`. Root `tsconfig.json` excludes `proxy` and `node_modules`; root `.gitignore` gains the three eval data paths. Branch `feat/answer-card` created from `origin/main` (spec branch already merged) and pushed.
+- Verified: `npx vitest run test/schema.test.ts` failed first on the unresolved `../src/card/schema.js` import; after implementation `npm test` → 10/10 passed, `npm run typecheck` → tsc exit 0. Root app `npx tsc --noEmit` → exit 0 (exclude does not break the app).
+- Deferred: none.
+- Next: Task 2.
 
 ## Needs Chase
 

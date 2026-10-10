@@ -39,3 +39,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# proxy eval data (private photos, neighborhood GPS, run outputs)
+proxy/eval/photos/
+proxy/eval/manifest.json
+proxy/eval/runs/
