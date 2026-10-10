@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { serve } from 'srvx';
 import { z } from 'zod';
+import { runCli } from '../cli.js';
 import { prepareImage } from '../image.js';
 import { PHOTOS_DIR, resolveRunDir } from '../paths.js';
 import type { Blind, RunResults, ScoreEntry, Scores } from '../types.js';
@@ -74,4 +75,4 @@ async function main(): Promise<void> {
   console.log(`Reviewing ${path.basename(runDir)} at ${server.url}  (Ctrl-C to stop)`);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) void main();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) void runCli(main);
