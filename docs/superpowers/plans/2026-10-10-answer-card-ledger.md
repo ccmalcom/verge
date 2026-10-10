@@ -48,6 +48,12 @@ One entry per finished task, appended in order:
 - Deferred: none.
 - Next: Task 4.
 
+### Task 4: Providers and the AI SDK generator
+- Done: `src/providers.ts` (`MODELS`, `PRICES_PER_MTOK`, `KEY_ENV`, `languageModel`, `estimateCostUsd`) and `src/generate.ts` (`Tier`, `UserContent`, `GenerateArgs`, `GenerateResult`, `Generator`, `InvalidOutputError`, `VendorError`, `aiSdkGenerator` on `generateText` + `Output.object`, image as a `file` part); tests `test/providers.test.ts`, `test/generate.test.ts` (MockLanguageModelV4). Code exactly as the plan wrote it; the inline content-part union type-checked, so the `TextPart`/`FilePart` fallback was not needed.
+- Verified: `npx vitest run test/providers.test.ts test/generate.test.ts` failed first ("Cannot find module '../src/generate.js'" / "'../src/providers.js'"); after implementation `npm test` → 6 files, 47/47 passed; `npm run typecheck` → tsc exit 0. No CLI step in this task (live vendor calls are Task 11's smoke test).
+- Deferred: none.
+- Next: Task 5.
+
 ## Needs Chase
 
 Items only Chase can supply. Add, never silently drop.
