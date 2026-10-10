@@ -252,11 +252,15 @@ All commands run from `proxy/` and require no manual input.
 - `eval/photos/`, `eval/manifest.json` and `eval/runs/` are gitignored (private
   photos and neighborhood GPS).
 
-### Known risk
+### HEIC photos
 
-iPhone photos are often HEIC. If the image library's prebuilt binaries cannot
-decode HEIC, the fallback is exporting photos as JPEG, or a system converter
-that Chase installs himself. Checked first in the plan.
+iPhone photos are HEIC by default, and Chase drops them in as they come off the
+phone. sharp's prebuilt binaries read HEIC headers but cannot decode the pixels
+(checked 2026-10-10), so the harness decodes HEIC with `heic-decode` (libheif as
+wasm, no system install) and passes the raw pixels to sharp for the usual
+resize and JPEG encode. Date and GPS are read from the original HEIC before
+decoding. The app (sub-project 2) is unaffected: its resize step re-encodes
+every capture to JPEG.
 
 ### On-device candidates (Apple, harness-only)
 
