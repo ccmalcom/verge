@@ -11,7 +11,7 @@ The state of record. Update after every task, commit and push it with the task.
 | Batch | Tasks | Status | Review |
 |---|---|---|---|
 | A | 1, 2 | done | |
-| B | 3, 4, 5 | in_progress | |
+| B | 3, 4, 5 | done | |
 | C | 6, 7 | pending | |
 | D | 8, 9 | pending | |
 | E | 10, 11 | pending | |
@@ -54,6 +54,12 @@ One entry per finished task, appended in order:
 - Deferred: none.
 - Next: Task 5.
 
+### Task 5: Ask pipeline and fetch handler
+- Done: `src/ask.ts`, `src/handler.ts`, `api/ask.ts`; tests `test/fakes.ts`, `test/ask.test.ts`, `test/handler.test.ts`. Committed as `e08a704` (committed by Chase after the agent's commit command was blocked by the secrets hook). One test-only typing deviation, below.
+- Verified: `npm test` → 8 files, 64/64 passed; `npm run typecheck` → tsc exit 0. Real-flow check ran without vendor keys loaded: each request logged only vendor, model, status, latency and token counts, with no note text or coordinates.
+- Deferred: none. Live vendor calls are Task 11's smoke test.
+- Next: end of batch (Batch C starts at Task 6).
+
 ## Needs Chase
 
 Items only Chase can supply. Add, never silently drop.
@@ -65,4 +71,4 @@ Items only Chase can supply. Add, never silently drop.
 Any place the code had to differ from the plan's text (an API that behaved differently, a type
 that needed adjusting), with the reason.
 
-(none yet)
+- Task 5, `proxy/test/handler.test.ts:30`: `(await res.json())` became `((await res.json()) as { card: { headline: string } })`. With @types/node 22, `Response.json()` returns `Promise<unknown>`, so tsc raised TS2571. Type-only; the assertion and expected value are unchanged, and no production code differs from the plan.
