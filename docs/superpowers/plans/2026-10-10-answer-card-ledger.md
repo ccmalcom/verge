@@ -13,7 +13,7 @@ The state of record. Update after every task, commit and push it with the task.
 | A | 1, 2 | done | |
 | B | 3, 4, 5 | done | |
 | C | 6, 7 | needs_chase | |
-| D | 8, 9 | in_progress | |
+| D | 8, 9 | done | |
 | E | 10, 11 | pending | |
 
 Status values: `pending`, `in_progress`, `done`, `needs_chase` (done except items below), `blocked`.
@@ -78,6 +78,12 @@ One entry per finished task, appended in order:
 - Deferred: an unknown vendor or flag (`eval:run -- --vendors mistral`) exits through an unhandled rejection that prints a stack trace with the clear message at its head; the plan's `void main()` has no catch. Left as written (exit is non-zero and the message names the bad vendor); a candidate polish for review.
 - Next: Task 9.
 
+### Task 9: Review page with blind scoring
+- Done: `proxy/eval/review/view.ts` (`EMPTY_SCORE`, `cardView`, `buildRunView`), `proxy/eval/review/server.ts` (`createReviewHandler`, CLI `main`), `proxy/eval/review/public/{index.html,card.js,app.js,styles.css}` (`renderCard` pure string renderer); tests `test/eval/card.test.ts`, `test/eval/review.test.ts`. Code as the plan wrote it except one test-only type cast (see Deviations).
+- Verified: `npx vitest run test/eval/card.test.ts test/eval/review.test.ts` failed first ("Cannot find module '../../eval/review/public/card.js'" / "'../../eval/review/server.js'"); after implementation `npm test` → 16 files, 111/111 passed; `npm run typecheck` → tsc exit 0 (after the cast). CLI (plan Step 7): `VERGE_EVAL_DIR=$(mktemp -d) npm run eval:review` printed ``Error: No runs yet. Run `npm run eval:run` first.`` and exited 1. Extra real flow on a synthetic run in a temp `VERGE_EVAL_DIR` (2000x1500 JPEG, one located photo case with an edible card for one vendor, one note-only case with a 502 record and a deeper answer): the server printed `Reviewing r1 at http://127.0.0.1:4791/`; `/`, `/app.js`, `/card.js`, `/styles.css` → 200 with the right content types; `/photo/a` → 200 `image/jpeg`, 1000x750; `/photo/b` (note-only) and `/nope` → 404; `/api/run` contained none of `anthropic|openai|claude|gpt`; POST score `{a, B, send}` → 200 and `scores.json` held `a|anthropic` (B mapped back to its vendor); verdict `great` → 400. Headless Chrome rendered the page: `CASE 1 OF 2 · 1/4 JUDGED`, cards A and B `WITH LOCATION`, the likely half-disc and confident disc marks, the safety block with the lookalike line between lead and rest, `Compare without location` and the location buttons, and the saved `Send unedited` pressed after reload. Click interactions in a real browser are left to Task 11's visual check, as the plan says.
+- Deferred: none. As in Task 8, `eval:review` failures exit through an unhandled rejection (stack trace under the clear message), since the plan's `void main()` has no catch.
+- Next: end of batch (Batch E starts at Task 10).
+
 ## Needs Chase
 
 Items only Chase can supply. Add, never silently drop.
@@ -93,3 +99,4 @@ that needed adjusting), with the reason.
 - Task 5, `proxy/test/handler.test.ts:30`: `(await res.json())` became `((await res.json()) as { card: { headline: string } })`. With @types/node 22, `Response.json()` returns `Promise<unknown>`, so tsc raised TS2571. Type-only; the assertion and expected value are unchanged, and no production code differs from the plan.
 - Task 6, `proxy/eval/image.ts`: `import sharp from 'sharp'` + `Promise<sharp.Sharp>` became `import sharp, { type Sharp } from 'sharp'` + `Promise<Sharp>`. sharp 0.35 resolves ESM types from `dist/index.d.mts`, which exports `Sharp` as a named interface and has no `sharp` namespace, so tsc raised TS2503. Type-only; no behavior change.
 - Task 8, `proxy/eval/run.ts` `executeRun` + added test `records a photo that fails to load against that case only and keeps going` in `proxy/test/eval/run.test.ts`. Ruling: the plan loaded every image up front with a bare `await`, so one corrupt photo (or a non-HEIC file named `.heic`, per the Task 6 observation) rejected `executeRun` and lost the whole run, contradicting Review Focus item 1 ("fails that one case with a clear error, never the whole run"). Each image load is now caught; that case's records get `status: 0` and `error: { error: 'bad_request', detail: 'image <file>: <message>' }` (prefixed with the file, which sharp's message omits), no ask is sent for it, and the rest of the run proceeds. No interface changed. Cost if wrong: one code path to revert; a failed photo would again abort the run.
+- Task 9, `proxy/test/eval/review.test.ts:57`: `const view = await (...).json();` became `const view = (await (...).json()) as { scores: Record<string, { verdict: string | null; actually: string }> };`. Same cause as the Task 5 deviation: with @types/node 22, `Response.json()` returns `Promise<unknown>`, so tsc raised TS18046. Type-only; assertions unchanged, no production code differs.
