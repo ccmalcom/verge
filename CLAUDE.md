@@ -15,7 +15,7 @@ the design tokens.
   rendered as a shape, never a number. Edible finds cap at "likely" and always
   show the safety block.
 - All data local (SQLite). The only server is proxy/, which holds the API key,
-  caps asks at 20/device/day, and stores nothing.
+  caps asks at 20/device/day, and stores nothing but that daily counter.
 - Tokens live in src/theme.ts, consumed by useTheme(); no inline hex in screens.
   Dark mode is in scope.
 
