@@ -11,7 +11,7 @@ The state of record. Update after every task, commit and push it with the task.
 | Batch | Tasks | Status | Review |
 |---|---|---|---|
 | A | 1, 2 | done | |
-| B | 3, 4, 5 | pending | |
+| B | 3, 4, 5 | in_progress | |
 | C | 6, 7 | pending | |
 | D | 8, 9 | pending | |
 | E | 10, 11 | pending | |
@@ -41,6 +41,12 @@ One entry per finished task, appended in order:
 - Verified: `npx vitest run test/context.test.ts test/enforce.test.ts` failed first ("Cannot find module '../src/card/context.js'" / "'../src/card/enforce.js'"); after implementation `npm test` → 3 files, 33/33 passed; `npm run typecheck` → tsc exit 0. No CLI step in this task.
 - Deferred: none.
 - Next: end of batch (Batch B starts at Task 3).
+
+### Task 3: Card prompts
+- Done: `src/card/prompt.ts` (`PROMPT_VERSION = 'p1'`, `TIER1_INSTRUCTIONS`, `DEEPER_INSTRUCTIONS`, `tierOneUserText`, `deeperUserText`) and `test/prompt.test.ts`. Code exactly as the plan wrote it.
+- Verified: `npx vitest run test/prompt.test.ts` failed first ("Cannot find module '../src/card/prompt.js'"); after implementation `npm test` → 4 files, 40/40 passed; `npm run typecheck` → tsc exit 0. No CLI step in this task.
+- Deferred: none.
+- Next: Task 4.
 
 ## Needs Chase
 
