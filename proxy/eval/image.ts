@@ -48,11 +48,26 @@ export async function prepareImage(input: string | Buffer): Promise<Buffer> {
 
 export type PhotoMeta = { taken_at: string | null; approx_location: LatLng | null };
 
+// The raw EXIF block, read by sharp rather than by exifr's own file sniffing: exifr 7.1.3 rejects
+// HEIF files whose ftyp box is over 50 bytes, which includes iPhone 16 HEICs (52 bytes, seen
+// 2026-10-10). sharp prefixes the TIFF data with "Exif\0\0", which exifr does not accept.
+async function exifBlock(filePath: string): Promise<Buffer | null> {
+  try {
+    const exif = (await sharp(filePath).metadata()).exif;
+    if (!exif) return null;
+    return exif.subarray(0, 6).toString('latin1') === 'Exif\0\0' ? exif.subarray(6) : exif;
+  } catch {
+    return null;
+  }
+}
+
 export async function readPhotoMeta(filePath: string): Promise<PhotoMeta> {
   let taken_at: string | null = null;
   let approx_location: LatLng | null = null;
+  const exif = await exifBlock(filePath);
+  if (!exif) return { taken_at, approx_location };
   try {
-    const tags = await exifr.parse(filePath, { pick: ['DateTimeOriginal'], reviveValues: false });
+    const tags = await exifr.parse(exif, { pick: ['DateTimeOriginal'], reviveValues: false });
     const raw: unknown = tags?.DateTimeOriginal;
     if (typeof raw === 'string' && /^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}/.test(raw)) {
       taken_at = `${raw.slice(0, 4)}-${raw.slice(5, 7)}-${raw.slice(8, 10)}T${raw.slice(11, 19)}`;
@@ -61,7 +76,7 @@ export async function readPhotoMeta(filePath: string): Promise<PhotoMeta> {
     // unreadable EXIF: fall back to null
   }
   try {
-    const gps = await exifr.gps(filePath);
+    const gps = await exifr.gps(exif);
     if (gps && Number.isFinite(gps.latitude) && Number.isFinite(gps.longitude) && !(gps.latitude === 0 && gps.longitude === 0)) {
       approx_location = roundLocation({ lat: gps.latitude, lng: gps.longitude });
     }
