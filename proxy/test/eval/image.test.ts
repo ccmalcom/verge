@@ -41,4 +41,28 @@ describe('readPhotoMeta', () => {
     writeFileSync(file, await syntheticJpeg(100, 100));
     expect(await readPhotoMeta(file)).toEqual({ taken_at: null, approx_location: null });
   });
+
+  const located = {
+    IFD2: { DateTimeOriginal: '2026:10:10 15:01:44' },
+    IFD3: { GPSLatitudeRef: 'N', GPSLatitude: '39/1 44/1 4560/100', GPSLongitudeRef: 'W', GPSLongitude: '86/1 9/1 720/100' },
+  };
+  const expected = { taken_at: '2026-10-10T15:01:44', approx_location: { lat: 39.746, lng: -86.152 } };
+
+  it('reads the capture date and rounded GPS from a JPEG', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'verge-meta-'));
+    const file = path.join(dir, 'located.jpg');
+    writeFileSync(file, await sharp({ create: { width: 64, height: 48, channels: 3, background: '#2e5e3e' } }).withExif(located).jpeg().toBuffer());
+    expect(await readPhotoMeta(file)).toEqual(expected);
+  });
+
+  // exifr 7.1.3 cannot open some HEIF containers itself (iPhone 16 HEICs carry a 52-byte ftyp box,
+  // over its 50-byte limit), so EXIF is read from sharp's metadata instead. This fixture is a HEIF
+  // container exifr also rejects; sharp cannot write HEVC, so it uses AV1.
+  it('reads the capture date and GPS from a HEIF container exifr cannot open directly', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'verge-meta-'));
+    const file = path.join(dir, 'located.heif');
+    writeFileSync(file, await sharp({ create: { width: 64, height: 48, channels: 3, background: '#2e5e3e' } }).withExif(located).heif({ compression: 'av1' }).toBuffer());
+    expect(await exifr.gps(file).catch(() => undefined)).toBeUndefined();
+    expect(await readPhotoMeta(file)).toEqual(expected);
+  });
 });
