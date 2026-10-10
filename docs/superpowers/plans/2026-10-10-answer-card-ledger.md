@@ -14,7 +14,7 @@ The state of record. Update after every task, commit and push it with the task.
 | B | 3, 4, 5 | done | |
 | C | 6, 7 | needs_chase | |
 | D | 8, 9 | done | |
-| E | 10, 11 | pending | |
+| E | 10, 11 | in_progress | |
 
 Status values: `pending`, `in_progress`, `done`, `needs_chase` (done except items below), `blocked`.
 
@@ -83,6 +83,12 @@ One entry per finished task, appended in order:
 - Verified: `npx vitest run test/eval/card.test.ts test/eval/review.test.ts` failed first ("Cannot find module '../../eval/review/public/card.js'" / "'../../eval/review/server.js'"); after implementation `npm test` → 16 files, 111/111 passed; `npm run typecheck` → tsc exit 0 (after the cast). CLI (plan Step 7): `VERGE_EVAL_DIR=$(mktemp -d) npm run eval:review` printed ``Error: No runs yet. Run `npm run eval:run` first.`` and exited 1. Extra real flow on a synthetic run in a temp `VERGE_EVAL_DIR` (2000x1500 JPEG, one located photo case with an edible card for one vendor, one note-only case with a 502 record and a deeper answer): the server printed `Reviewing r1 at http://127.0.0.1:4791/`; `/`, `/app.js`, `/card.js`, `/styles.css` → 200 with the right content types; `/photo/a` → 200 `image/jpeg`, 1000x750; `/photo/b` (note-only) and `/nope` → 404; `/api/run` contained none of `anthropic|openai|claude|gpt`; POST score `{a, B, send}` → 200 and `scores.json` held `a|anthropic` (B mapped back to its vendor); verdict `great` → 400. Headless Chrome rendered the page: `CASE 1 OF 2 · 1/4 JUDGED`, cards A and B `WITH LOCATION`, the likely half-disc and confident disc marks, the safety block with the lookalike line between lead and rest, `Compare without location` and the location buttons, and the saved `Send unedited` pressed after reload. Click interactions in a real browser are left to Task 11's visual check, as the plan says.
 - Deferred: none. As in Task 8, `eval:review` failures exit through an unhandled rejection (stack trace under the clear message), since the plan's `void main()` has no catch.
 - Next: end of batch (Batch E starts at Task 10).
+
+### Task 10: Summary and export
+- Done: `proxy/eval/summary.ts` (`VendorSummary`, `passBar`, `summarize`, `formatSummary`, CLI with `--compare`) and `proxy/eval/export.ts` (`pickCards`, `renderExport`, CLI with `--pick`, `--vendor`, `--ids`); tests `test/eval/summary.test.ts`, `test/eval/export.test.ts`. Code exactly as the plan wrote it.
+- Verified: `npx vitest run test/eval/summary.test.ts test/eval/export.test.ts` failed first ("Cannot find module '../../eval/summary.js'" / "'../../eval/export.js'"); after implementation `npm test` → 18 files, 118/118 passed; `npm run typecheck` → tsc exit 0. Extra real flow (the task has no CLI step) on a synthetic run in a temp `VERGE_EVAL_DIR` (one photo case, one note-only case, two vendors, one `send` score): `eval:summary` printed `Pass bar: 2 of 2`, a three-line row per vendor with `openai send 1/2 ... judged 1`, `accuracy 100%`, `p50 101 ms`, `cost/ask $0.0010`; `eval:export -- --pick 2` printed `Wrote 2 card(s) to .../export.html`; the page held one JPEG data URI and one `NOTE-ONLY CAPTURE` block, and zero matches for `anthropic|openai|claude|gpt|gemini`.
+- Deferred: none.
+- Next: Task 11.
 
 ## Needs Chase
 
