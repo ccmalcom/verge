@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { runCli } from './cli.js';
 import { prepareImage } from './image.js';
 import { defaultVariant } from './manifest.js';
 import { PHOTOS_DIR, resolveRunDir } from './paths.js';
@@ -80,4 +81,4 @@ async function main(): Promise<void> {
   console.log('The export omits which vendor produced the cards; `npm run eval:summary` has that.');
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) void main();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) void runCli(main);

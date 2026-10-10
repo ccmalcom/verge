@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { runCli } from './cli.js';
 import { readPhotoMeta } from './image.js';
 import { scaffold } from './manifest.js';
 import { MANIFEST_PATH, PHOTOS_DIR } from './paths.js';
@@ -16,4 +17,4 @@ async function main(): Promise<void> {
   if (manifest.cases.length === 0) console.log(`Add photos (and optional same-name .txt notes) to ${PHOTOS_DIR}`);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) void main();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) void runCli(main);

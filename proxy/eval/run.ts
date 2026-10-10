@@ -9,6 +9,7 @@ import { aiSdkGenerator } from '../src/generate.js';
 import { createHandler } from '../src/handler.js';
 import { estimateCostUsd } from '../src/providers.js';
 import { appleGenerator, fmAvailable } from './apple-fm.js';
+import { runCli } from './cli.js';
 import { hasKey, loadEnvLocal } from './env.js';
 import { prepareImage } from './image.js';
 import { MANIFEST_PATH, PHOTOS_DIR, RUNS_DIR } from './paths.js';
@@ -273,4 +274,4 @@ async function main(): Promise<void> {
   console.log('Next: npm run eval:review');
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) void main();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) void runCli(main);

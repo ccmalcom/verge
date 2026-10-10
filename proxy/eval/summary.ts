@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { runCli } from './cli.js';
 import { defaultVariant } from './manifest.js';
 import { resolveRunDir } from './paths.js';
 import type { HarnessVendor, ResultRecord, RunResults, ScoreEntry, Scores } from './types.js';
@@ -107,4 +108,4 @@ function main(): void {
   console.log(formatSummary(summarize(current.results, current.scores), compare ? summarize(compare.results, compare.scores) : undefined));
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) main();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) void runCli(main);
