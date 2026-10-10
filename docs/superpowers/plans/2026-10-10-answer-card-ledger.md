@@ -14,7 +14,7 @@ The state of record. Update after every task, commit and push it with the task.
 | B | 3, 4, 5 | done | |
 | C | 6, 7 | needs_chase | |
 | D | 8, 9 | done | |
-| E | 10, 11 | in_progress | |
+| E | 10, 11 | needs_chase | |
 
 Status values: `pending`, `in_progress`, `done`, `needs_chase` (done except items below), `blocked`.
 
@@ -90,12 +90,22 @@ One entry per finished task, appended in order:
 - Deferred: none.
 - Next: Task 11.
 
+### Task 11: Live smoke test, eval README, real-flow verification, PR
+- Done: `proxy/vitest.smoke.config.ts`, `proxy/test/smoke/live.test.ts` (`npm run smoke`), `proxy/eval/README.md`. Code and README exactly as the plan wrote them.
+- Verified: `npm test` → 18 files, 118/118 passed; `npm run typecheck` → tsc exit 0. `npm run smoke` (real vendor calls; keys checked only through `hasKey`, `.env.local` never read): `live anthropic` PASS (3.4 s), `live openai` PASS (6.0 s), `live google` FAIL with a 502 `vendor_error` whose detail is Google's own "Your prepayment credits are depleted" billing message, so the key is set but the account has no credit (see Needs Chase). Real flow (plan Step 4, temp `VERGE_EVAL_DIR`, 1600x1200 synthetic JPEG + note-only `hawk.txt`): `eval:scaffold` → `2 case(s), 0 with location`; `eval:run -- --vendors anthropic,openai,google --concurrency 2` → `6 card request(s), 2 failed`, exit 0; the two failures are both google 502 (credits), and the four anthropic/openai records are 200 with `cant_tell` cards (expected for a flat-colour image and a bare note), three with a 200 deeper answer and one (openai brick) with none; `blind.json` and `results.json` written. Review server on port 4799 printed `Reviewing <run> at http://127.0.0.1:4799/`; `/api/run` returned the blind view; POST `{hawk, A, send}` → `{"score":{"verdict":"send",...}}` and `scores.json` held `hawk|anthropic` (A mapped back to its vendor). `eval:summary` → `Pass bar: 2 of 2`, `anthropic send 1/2 ... judged 1 ... can't tell 2 errors 0 ... p50 3010 ms cost/ask $0.0077`, `openai send 0/2 ... p50 4006 ms cost/ask $0.0062`, `google ... errors 2`. `eval:export -- --pick 2` → `Wrote 2 card(s)`; the page held one JPEG data URI, one note-only block and zero matches for `anthropic|openai|claude|gpt|gemini`. Temp dir deleted.
+- Deferred: (1) Observation for review, not changed (Task 9 code): `/api/run` is blind except on a failed record, where the vendor's own error detail is passed through; Google's billing message names `ai.google.dev/gemini-api`, so a viewer can tell which label is Google on that case. It only affects error cards, which carry no card to judge, and labels are shuffled per case. (2) The page's click interactions in a real browser are not exercised by an agent here; they are covered by Chase's review round below.
+- Next: end of batch (plan complete).
+
 ## Needs Chase
 
 Items only Chase can supply. Add, never silently drop.
 
 - Apple `fm` CLI on Chase's Mac (Task 7, checked in Task 11): run `appleGenerator('device')` and `appleGenerator('pcc')` against real `fm respond`, in the default `prompt` mode and with `APPLE_FM_SCHEMA_MODE=json-schema`, to confirm the argument shape (`--instructions`, `--image`, `--model pcc`, `--schema`) and whether `fm` accepts a plain JSON Schema file. Cannot run on Linux: `fm` is not on PATH here.
 - Real iPhone HEIC photos (Task 6, checked in Task 11): the HEIC path was verified with a mocked decoder and with the real heic-decode rejecting a fake header; decoding a genuine iPhone HEIC (and its EXIF date/GPS) needs Chase's photos.
+- Google Gemini billing (Task 11): the key in `proxy/.env.local` is set, but live calls fail with Google's "prepayment credits are depleted" message. Top up credit for the project in AI Studio, then `cd proxy && npm run smoke` (expect three PASS). Anthropic and OpenAI already pass.
+- Your own photo round (Task 11): put at least 3 of your own JPEG photos in `proxy/eval/photos/`, then scaffold → run → open the review page in a browser and judge them → summary. Confirm a GPS-tagged photo shows "with location" (verifies EXIF GPS reading on a real phone photo). Include at least one untouched iPhone HEIC taken in portrait: it must appear upright on the review page, and scaffold must report its real capture date and location (verifies HEIC decoding, rotation and HEIC EXIF on a real file). This also exercises the review page's clicks in a real browser.
+- On the Mac (macOS 27, Task 11): `fm respond --help` and `fm schema --help`; confirm the flags used in `eval/apple-fm.ts` (`--instructions`, `--image`, `--model pcc`, `--schema`); run `npm run eval:run -- --vendors apple-device,apple-pcc --cases <one-id>`; then try `APPLE_FM_SCHEMA_MODE=json-schema` once and note whether `fm` accepts a JSON Schema file.
+- Then the full 30-photo round per the spec.
 
 ## Deviations from the plan
 
