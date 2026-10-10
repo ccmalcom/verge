@@ -13,7 +13,7 @@ The state of record. Update after every task, commit and push it with the task.
 | A | 1, 2 | done | |
 | B | 3, 4, 5 | done | |
 | C | 6, 7 | needs_chase | |
-| D | 8, 9 | pending | |
+| D | 8, 9 | in_progress | |
 | E | 10, 11 | pending | |
 
 Status values: `pending`, `in_progress`, `done`, `needs_chase` (done except items below), `blocked`.
@@ -72,6 +72,12 @@ One entry per finished task, appended in order:
 - Deferred: live `fm` verification, to Task 11 on Chase's Mac (as the plan intends).
 - Next: end of batch (Batch D starts at Task 8).
 
+### Task 8: Retention and the run command
+- Done: `proxy/eval/env.ts` (`loadEnvLocal`, `hasKey`), `proxy/eval/retention.ts` (`pruneRuns`), `proxy/eval/run.ts` (`parseRunArgs`, `resolveVendors`, `planRequests`, `buildCardBody`, `makeBlind`, `mapPool`, `executeRun`, CLI `main`); tests `test/eval/retention.test.ts`, `test/eval/run.test.ts`. Code as the plan wrote it, plus one added test and per-case image error handling in `executeRun` (see Deviations).
+- Verified: `npx vitest run test/eval/retention.test.ts test/eval/run.test.ts` failed first ("Cannot find module '../../eval/retention.js'" / "'../../eval/run.js'"); after implementation `npm test` → 14 files, 101/101 passed; the added test failed first (the thrown image error rejected the whole run) and passed after the fix: `npm test` → 14 files, 102/102 passed; `npm run typecheck` → tsc exit 0. CLI (plan Step 6, temp `VERGE_EVAL_DIR`): scaffold printed `1 case(s), 0 with location`; run printed ``Skipping apple-device: `fm` is not on PATH (needs macOS 27 on Apple silicon)``, `No vendors available.`, `exit 1`, no stack trace. Extra CLI check in a temp dir: with `runs/old` (unscored, mtime 20 days), `runs/fresh` (unscored) and `runs/judged` (scored, 400 days), `eval:run --vendors apple-device,apple-pcc` printed `Pruned 1 old unscored run(s).` and left `fresh` and `judged`. No cloud call was made (Apple-only vendor list).
+- Deferred: an unknown vendor or flag (`eval:run -- --vendors mistral`) exits through an unhandled rejection that prints a stack trace with the clear message at its head; the plan's `void main()` has no catch. Left as written (exit is non-zero and the message names the bad vendor); a candidate polish for review.
+- Next: Task 9.
+
 ## Needs Chase
 
 Items only Chase can supply. Add, never silently drop.
@@ -86,3 +92,4 @@ that needed adjusting), with the reason.
 
 - Task 5, `proxy/test/handler.test.ts:30`: `(await res.json())` became `((await res.json()) as { card: { headline: string } })`. With @types/node 22, `Response.json()` returns `Promise<unknown>`, so tsc raised TS2571. Type-only; the assertion and expected value are unchanged, and no production code differs from the plan.
 - Task 6, `proxy/eval/image.ts`: `import sharp from 'sharp'` + `Promise<sharp.Sharp>` became `import sharp, { type Sharp } from 'sharp'` + `Promise<Sharp>`. sharp 0.35 resolves ESM types from `dist/index.d.mts`, which exports `Sharp` as a named interface and has no `sharp` namespace, so tsc raised TS2503. Type-only; no behavior change.
+- Task 8, `proxy/eval/run.ts` `executeRun` + added test `records a photo that fails to load against that case only and keeps going` in `proxy/test/eval/run.test.ts`. Ruling: the plan loaded every image up front with a bare `await`, so one corrupt photo (or a non-HEIC file named `.heic`, per the Task 6 observation) rejected `executeRun` and lost the whole run, contradicting Review Focus item 1 ("fails that one case with a clear error, never the whole run"). Each image load is now caught; that case's records get `status: 0` and `error: { error: 'bad_request', detail: 'image <file>: <message>' }` (prefixed with the file, which sharp's message omits), no ask is sent for it, and the rest of the run proceeds. No interface changed. Cost if wrong: one code path to revert; a failed photo would again abort the run.
