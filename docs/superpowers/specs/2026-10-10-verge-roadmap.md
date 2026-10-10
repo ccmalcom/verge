@@ -21,7 +21,7 @@ dev tooling (the eval harness asks Chase to fill in nothing).
 
 | # | Name | Scope | Exit gate |
 |---|------|-------|-----------|
-| 1 | Answer card | proxy/ fetch handler, card schema + prompt + guardrails, three-vendor eval harness with review page. No app UI. Spec: 2026-10-10-answer-card-design.md | ≥20 of 30 cards "send unedited" for the chosen vendor; safety block fires on every edible find; Chase is satisfied with the card |
+| 1 | Answer card | proxy/ fetch handler, card schema + prompt + guardrails, three-vendor eval harness with review page, plus optional Apple on-device and Private Cloud Compute candidates run via the macOS `fm` CLI. No app UI. Spec: 2026-10-10-answer-card-design.md | ≥20 of 30 cards "send unedited" for the chosen vendor; safety block fires on every edible find; Chase is satisfied with the card |
 | 2 | Capture + journal | Expo Router scaffold, camera + note-only capture, client-side resize + EXIF strip, SQLite (capture, answer, reaction), answer card UI (imports #1's schema), reactions, journal with lens filter. Deploys the proxy to Vercel with a device ID header and the 20 asks/device/day counter (Upstash Redis) | The daily loop works end to end on a phone: capture → ask → card → journal → reaction |
 | 3 | Prompts | Bank of ~100 hand-written prompts tagged by lens, shape, effort, season, weather; Today screen; Explore sheet; weighted 3:1 selection with reaction decay and the 1-in-4 serendipity draw; lens settings; three-screen skippable onboarding | Today serves a prompt that respects lens settings; selection is unit-tested for the serendipity quota |
 | 4 | Pilot readiness | Local event log (capture, ask, go-deeper, reactions by lens, unprompted returns), JSON export, delete-all, location consent at first capture, dark mode token set, badges (First finds, Field naturalist only), opt-in morning invitation, TestFlight / internal track build | Five testers can install it |
@@ -48,3 +48,15 @@ Each is confirmed in the named sub-project's spec.
 - `enforce.ts` guardrails (edible cap, safety copy, tier-2 label) run in the proxy
   and are rendered by the app from the flags they set. The app never re-derives
   them from model text.
+
+## Decisions waiting on sub-project 1's results
+
+- **Vendor** for production asks: whichever cloud vendor clears the exit gate best on
+  cards, cost and latency.
+- **On-device first pass** (iOS 27, Apple Intelligence devices): whether the on-device
+  model is good enough to classify or flag "can't tell" before a cloud call, and
+  whether Private Cloud Compute could serve iOS asks. Decided in #2's spec from the
+  `apple-device` / `apple-pcc` harness scores. The cloud path remains the default on
+  every device regardless.
+- **Gemini Nano spike**: only if the Apple results are promising; needs a physical
+  supported Android device.

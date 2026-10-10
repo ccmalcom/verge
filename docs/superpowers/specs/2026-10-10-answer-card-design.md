@@ -24,7 +24,9 @@ Success criteria (from product spec §5):
 - The with/without-location comparison says whether location improves answers.
 
 Out of scope for this sub-project: any Expo/app code, deployment, the per-device
-daily counter, device IDs, search grounding, specialist plant identifiers.
+daily counter, device IDs, search grounding, specialist plant identifiers,
+Gemini Nano testing (needs a physical Pixel 9+/Galaxy S26; a later spike if the
+Apple on-device results below are promising).
 
 ## Decisions locked in brainstorming
 
@@ -39,6 +41,10 @@ daily counter, device IDs, search grounding, specialist plant identifiers.
 - Judging via a local review page with recorded scores.
 - Photos plus an auto-scaffolded manifest that requires no manual input.
 - Derive, don't ask (see roadmap): no field must be filled in by hand.
+- On-device candidates: the harness also runs Apple's on-device model and
+  Apple Private Cloud Compute via the macOS 27 `fm` CLI, as optional
+  harness-only vendors (see "On-device candidates" below). They never block
+  this sub-project's exit gate.
 
 ## Layout
 
@@ -53,9 +59,10 @@ proxy/
   src/card/prompt.ts     system prompts + per-class guidance; PROMPT_VERSION
   src/card/enforce.ts    deterministic guardrails (pure)
   src/card/context.ts    season from date, location rounding, context text
-  src/providers.ts       vendor → { tier1Model, deeperModel }; the only vendor-aware file
+  src/providers.ts       vendor → { tier1Model, deeperModel }; the only vendor-aware file in the proxy
   eval/
     scaffold.ts  run.ts  review/  summary.ts  export.ts  retention.ts
+    apple-fm.ts  harness-only adapter that shells out to the `fm` CLI (macOS 27)
     photos/      (gitignored) Chase's photos and optional .txt note-only cases
     manifest.json (gitignored)
     runs/        (gitignored)
@@ -251,6 +258,41 @@ iPhone photos are often HEIC. If the image library's prebuilt binaries cannot
 decode HEIC, the fallback is exporting photos as JPEG, or a system converter
 that Chase installs himself. Checked first in the plan.
 
+### On-device candidates (Apple, harness-only)
+
+Research on 2026-10-10 (vendor docs, not yet run live) found that Apple's
+on-device Foundation Model takes image input from iOS 27 / macOS 27, with guided
+generation, on Apple Intelligence devices only (an estimated 25–35% of active
+iPhones). Private Cloud Compute (PCC), a larger model with a 32K context, is
+available to third-party apps with an entitlement. No published evidence says
+either identifies species or architecture well, so the harness measures it.
+
+- Two optional vendors: `apple-device` (on-device model) and `apple-pcc` (PCC).
+  `eval/apple-fm.ts` invokes the `fm` CLI (`fm respond … --image … --schema …`,
+  `--model pcc` for PCC) with the same system prompt, context text and resized
+  photo, and a JSON Schema generated from the tier-1 Zod schema. Its output goes
+  through the same Zod validation and `enforce.ts` as the cloud vendors, and its
+  cards appear blind on the same review page.
+- These run in the harness directly, not through the proxy: the proxy runs on
+  Vercel (Linux) and could never call them. In production they would be a
+  device-side path in the app, not a proxy branch.
+- Auto-skipped with a warning when `fm` is not on PATH, so the harness still runs
+  on Linux. The full run including Apple vendors happens on Chase's Apple-silicon
+  Mac on macOS 27.
+- Context limit: Apple's docs say 4,096 tokens for the on-device model (a WWDC26
+  sample shows 8,192); the adapter reads the actual limit if the CLI exposes it.
+  If prompt + image exceed it, the case is recorded as an error with that reason.
+  The prompt is not condensed for Apple, so results stay comparable.
+- Exact `fm` flags, schema format and image handling are verified against the
+  installed CLI's `--help` and Apple's docs at plan time; the flags above come from
+  research, not a live run.
+- What the results decide (after #1, not in it): whether an on-device first pass
+  (class or "can't tell" before any cloud call) is worth building on capable iOS
+  devices, whether PCC could serve iOS asks, and whether a Gemini Nano spike on a
+  physical device is worth it. The cloud path stays the default on every device
+  either way. React Native's `@react-native-ai/apple` 0.12.0 drops image input
+  silently, so any app-side use needs a native module or an updated wrapper.
+
 ## Testing
 
 - Unit (Vitest): `enforce` (cap, safety attach, label mapping, cant_tell asks,
@@ -260,7 +302,10 @@ that Chase installs himself. Checked first in the plan.
 - Handler contract tests against a mocked model: valid card; invalid output →
   retry → 422; vendor error → 502; 400 and 413 paths; vendor override ignored
   without the env flag; no content in logs.
-- Live smoke: one real photo per vendor, skipped when that vendor's key is absent.
+- Live smoke: one real photo per vendor, skipped when that vendor's key is absent
+  (or, for Apple vendors, when `fm` is not on PATH).
+- `apple-fm.ts` unit tests run against a stub `fm` executable (argument building,
+  JSON parsing, context-limit and missing-binary errors).
 - Real-flow verification before "done": scaffold → run on at least three of
   Chase's photos across all available vendors → review page click-through with
   scores saved → summary prints. Tests alone do not count.
