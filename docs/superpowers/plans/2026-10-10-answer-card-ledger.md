@@ -10,7 +10,7 @@ The state of record. Update after every task, commit and push it with the task.
 
 | Batch | Tasks | Status | Review |
 |---|---|---|---|
-| A | 1, 2 | in_progress | |
+| A | 1, 2 | done | |
 | B | 3, 4, 5 | pending | |
 | C | 6, 7 | pending | |
 | D | 8, 9 | pending | |
@@ -35,6 +35,12 @@ One entry per finished task, appended in order:
 - Verified: `npx vitest run test/schema.test.ts` failed first on the unresolved `../src/card/schema.js` import; after implementation `npm test` → 10/10 passed, `npm run typecheck` → tsc exit 0. Root app `npx tsc --noEmit` → exit 0 (exclude does not break the app).
 - Deferred: none.
 - Next: Task 2.
+
+### Task 2: Context helpers and deterministic guardrails
+- Done: `src/card/context.ts` (`seasonFor`, `roundCoord`, `roundLocation`, `contextText`) and `src/card/enforce.ts` (fixed safety copy, `checkCardRules`, `enforceCard` with edible cap at `likely` + safety block, help_asks kept only for `cant_tell`, follow_ups trimmed to three; `enforceDeeper`); tests `test/context.test.ts`, `test/enforce.test.ts`. Code exactly as the plan wrote it.
+- Verified: `npx vitest run test/context.test.ts test/enforce.test.ts` failed first ("Cannot find module '../src/card/context.js'" / "'../src/card/enforce.js'"); after implementation `npm test` → 3 files, 33/33 passed; `npm run typecheck` → tsc exit 0. No CLI step in this task.
+- Deferred: none.
+- Next: end of batch (Batch B starts at Task 3).
 
 ## Needs Chase
 
