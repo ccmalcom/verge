@@ -101,11 +101,12 @@ for (const b of scout.pending) {
     { label: `implement:${b.batch}`, phase: 'Implement', schema: IMPL_SCHEMA },
   )
 
+  // Collect before the blocked check: a blocked agent's needs_chase is usually why it stopped.
+  if (impl) needsChase.push(...impl.needs_chase)
   if (!impl || impl.status === 'blocked') {
     stopped = { batch: b.batch, stage: 'implement', reason: impl ? impl.notes : 'implement agent failed' }
     break
   }
-  needsChase.push(...impl.needs_chase)
 
   const reviewPrompt = (round) =>
     `Review Batch ${b.batch} (Tasks ${tasks}) of the plan at ${PLAN} on branch ${scout.branch}${round > 1 ? ' after a fix pass' : ''}. ` +
@@ -133,11 +134,11 @@ for (const b of scout.pending) {
         `${GIT_RULES}\nReturn status "blocked" if an issue cannot be fixed without changing the plan's interfaces.`,
       { label: `fix:${b.batch}`, phase: 'Fix', schema: IMPL_SCHEMA },
     )
+    if (fix) needsChase.push(...fix.needs_chase)
     if (!fix || fix.status === 'blocked') {
       stopped = { batch: b.batch, stage: 'fix', reason: fix ? fix.notes : 'fix agent failed', issues: review.issues }
       break
     }
-    needsChase.push(...fix.needs_chase)
     review = await agent(reviewPrompt(2), { label: `re-review:${b.batch}`, phase: 'Fix', schema: REVIEW_SCHEMA })
   }
 
